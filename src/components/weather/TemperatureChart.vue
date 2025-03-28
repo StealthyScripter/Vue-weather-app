@@ -16,7 +16,11 @@ import type { ChartConfiguration, ChartItem } from 'chart.js';
 export default defineComponent({
   name: 'TemperatureChart',
   props: {
-    tempData: {
+    maxTempData: {
+      type: Array as PropType<number[]>,
+      required: true
+    },
+    minTempData: {
       type: Array as PropType<number[]>,
       required: true
     },
@@ -53,14 +57,24 @@ export default defineComponent({
         type: 'line',
         data: {
           labels: props.timeLabels,
-          datasets: [{
-            label: `Temperature (${props.temperatureUnit})`,
-            data: props.tempData,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-            borderColor: 'rgba(255, 99, 132, 1)',
-            borderWidth: 1,
-            tension: 0.4
-          }]
+          datasets: [
+            {
+              label: `High Temperature (${props.temperatureUnit})`,
+              data: props.maxTempData,
+              backgroundColor: 'rgba(255, 99, 132, 0.5)',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 2,
+              tension: 0.4
+            },
+            {
+              label: `Low Temperature (${props.temperatureUnit})`,
+              data: props.minTempData,
+              backgroundColor: 'rgba(54, 162, 235, 0.5)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 2,
+              tension: 0.4
+            }
+          ]
         },
         options: {
           responsive: true,
@@ -93,9 +107,17 @@ export default defineComponent({
 
       // Update chart data
       chartInstance.data.labels = props.timeLabels;
+      
+      // Update max temperature dataset
       if (chartInstance.data.datasets[0]) {
-        chartInstance.data.datasets[0].data = props.tempData;
-        chartInstance.data.datasets[0].label = `Temperature (${props.temperatureUnit})`;
+        chartInstance.data.datasets[0].data = props.maxTempData;
+        chartInstance.data.datasets[0].label = `High Temperature (${props.temperatureUnit})`;
+      }
+      
+      // Update min temperature dataset
+      if (chartInstance.data.datasets[1]) {
+        chartInstance.data.datasets[1].data = props.minTempData;
+        chartInstance.data.datasets[1].label = `Low Temperature (${props.temperatureUnit})`;
       }
 
       // Update chart
@@ -103,7 +125,8 @@ export default defineComponent({
     };
 
     // Watch for changes in data
-    watch(() => props.tempData, updateChart, { deep: true });
+    watch(() => props.maxTempData, updateChart, { deep: true });
+    watch(() => props.minTempData, updateChart, { deep: true });
     watch(() => props.timeLabels, updateChart, { deep: true });
     watch(() => props.temperatureUnit, updateChart);
 

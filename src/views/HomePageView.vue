@@ -3,7 +3,6 @@ import CurrentWeather from '../components/weather/CurrentWeather.vue'
 import CurrentWeatherDetails from '../components/weather/CurrentWeatherDetails.vue'
 import PageInfo from '@/components/layout/PageInfo.vue'
 import TemperatureChart from '../components/weather/TemperatureChart.vue'
-import PrecipitationChart from '../components/weather/PrecipitationChart.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useWeatherStore } from '@/stores/weather'
 import { storeToRefs } from 'pinia'
@@ -38,21 +37,19 @@ watch(temperatureUnit, (newUnit) => {
 })
 
 // Extract data for charts
-const hourlyTemps = computed(() => {
+const hourlyHighTemps = computed(() => {
   if (!hourlyForecast.value || hourlyForecast.value.length === 0) return []
-  return hourlyForecast.value.map(hour => hour.temp)
+  return hourlyForecast.value.map(hour => hour.high)
+})
+
+const hourlyLowTemps = computed(() => {
+  if (!hourlyForecast.value || hourlyForecast.value.length === 0) return []
+  return hourlyForecast.value.map(hour => hour.low)
 })
 
 const timeLabels = computed(() => {
   if (!hourlyForecast.value || hourlyForecast.value.length === 0) return []
   return hourlyForecast.value.map(hour => hour.time)
-})
-
-// Placeholder precipitation data (since API doesn't provide it directly)
-const precipData = computed(() => {
-  if (!hourlyForecast.value || hourlyForecast.value.length === 0) return []
-  // Simply return an array of zeros matching the hourly data length
-  return new Array(hourlyForecast.value.length).fill(0)
 })
 
 // Load data on component mount if not already loaded
@@ -93,18 +90,11 @@ onMounted(() => {
       <!-- Chart components -->
       <TemperatureChart
         v-if="hourlyForecast && hourlyForecast.length > 0"
-        :tempData="hourlyTemps"
+        :maxTempData="hourlyHighTemps"
+        :minTempData="hourlyLowTemps"
         :timeLabels="timeLabels"
         :temperatureUnit="unit"
         title="Today's Temperature"
-      />
-
-      <PrecipitationChart
-        v-if="hourlyForecast && hourlyForecast.length > 0"
-        :chartData="precipData"
-        :timeLabels="timeLabels"
-        timeUnit="hourly"
-        title="Today's Precipitation"
       />
     </div>
   </div>

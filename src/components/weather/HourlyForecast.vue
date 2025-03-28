@@ -3,7 +3,8 @@ import { formatTemperature } from '@/utils/temperatureConverter';
 
 interface HourlyItem {
   time: string;
-  temp: number;
+  high: number;
+  low:number;
   icon: number | string;
   condition?: string;
 }
@@ -56,7 +57,8 @@ const getWeatherIcon = (icon: string | number) => {
         <div class="forecast-icon">
           {{ getWeatherIcon(hour.icon) }}
         </div>
-        <div class="forecast-temp">{{ formatTemperature(hour.temp, unit) }}</div>
+        <div class="forecast-temp">{{ formatTemperature(hour.high, unit) }}</div>
+        <div class="forecast-temp low-temp">{{ formatTemperature(hour.low, unit) }}</div>
       </div>
     </div>
   </div>

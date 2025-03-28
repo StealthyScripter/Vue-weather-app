@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getWeatherByCity, getWeatherCodeDescription } from '../services/weatherApi'
 import { formatHour } from '@/utils/dateFormatter'
+import { faRandom } from '@fortawesome/free-solid-svg-icons';
 
 // Define interfaces for better type safety
 interface CurrentWeather {
@@ -19,7 +20,8 @@ interface CurrentWeather {
 
 interface HourlyForecast {
   time: string;
-  temp: number;
+  low:number;
+  high:number;
   icon: number;
   condition: string;
 }
@@ -132,10 +134,12 @@ export const useWeatherStore = defineStore('weather', () => {
 
         const hourlyData= times.map((time, index) => {
           const displayTime = index === 0 ? "Now" : formatHour(time);
+          const currentTemp = toNumber(temps[index]);
 
           return {
             time: displayTime,
-            temp: toNumber(temps[index]),
+            high:currentTemp + (Math.floor(Math.random() * (5 - 1 + 1)) + 1),
+            low:currentTemp,
             icon: toNumber(codes[index]),
             condition: getWeatherCodeDescription(toNumber(codes[index]))
     };

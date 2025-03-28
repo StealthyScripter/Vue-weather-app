@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import PageInfo from '@/components/layout/PageInfo.vue'
 import TemperatureChart from '@/components/weather/TemperatureChart.vue'
-import PrecipitationChart from '@/components/weather/PrecipitationChart.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useWeatherStore } from '@/stores/weather'
 import { storeToRefs } from 'pinia'
@@ -46,13 +45,6 @@ const tempMinData = computed(() => {
 const dayLabels = computed(() => {
   if (!dailyForecast.value || dailyForecast.value.length === 0) return []
   return dailyForecast.value.map(day => day.day)
-})
-
-// Placeholder precipitation data (since API doesn't provide it directly)
-const precipData = computed(() => {
-  if (!dailyForecast.value || dailyForecast.value.length === 0) return []
-  // Simply return an array of zeros matching the daily data length
-  return new Array(dailyForecast.value.length).fill(0)
 })
 
 // Get weather icon based on condition text
@@ -119,27 +111,14 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Charts -->
+      <!-- Temperature Chart -->
       <TemperatureChart
-        :tempData="tempMaxData"
-        :timeLabels="dayLabels"
-        :temperatureUnit="unit"
-        title="7-Day High Temperature"
-      />
-
-      <TemperatureChart
-        :tempData="tempMinData"
-        :timeLabels="dayLabels"
-        :temperatureUnit="unit"
-        title="7-Day Low Temperature"
-      />
-
-      <PrecipitationChart
-        :chartData="precipData"
-        :timeLabels="dayLabels"
-        timeUnit="daily"
-        title="7-Day Precipitation"
-      />
+    :maxTempData="tempMaxData"
+    :minTempData="tempMinData"
+    :timeLabels="dayLabels"
+    :temperatureUnit="unit"
+    title="7-Day Temperature Forecast"
+  />
     </div>
   </div>
 </template>
