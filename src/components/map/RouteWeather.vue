@@ -6,8 +6,23 @@ import { storeToRefs } from 'pinia';
 import { getWeatherAtTime } from '@/utils/mapUtils';
 import { formatTemperature } from '@/utils/temperatureConverter';
 
+// Define interfaces for better type safety
+interface WeatherPoint {
+  temp: number;
+  condition: string;
+  icon?: number | string;
+}
+
+interface TimelinePoint {
+  time: Date;
+  formattedTime: string;
+  location: { lat: number; lng: number } | null;
+  weather: WeatherPoint | null;
+  progress: number;
+}
+
 const props = defineProps<{
-  routePoints: any[];
+  routePoints: [number,number][];
   etaTime: Date | null;
   routeDuration: number; // in minutes
   timeInterval: number; // in minutes, default 60
@@ -18,12 +33,12 @@ const weatherStore = useWeatherStore();
 const { hourlyForecast, temperatureUnit } = storeToRefs(weatherStore);
 
 // Generate timeline points based on route duration and interval
-const timelinePoints = computed(() => {
+const timelinePoints = computed<TimelinePoint[]>(() => {
   if (!props.etaTime || props.routeDuration <= 0) {
     return [];
   }
 
-  const points = [];
+  const points: TimelinePoint[] = [];
   const now = new Date();
   const etaMs = props.etaTime.getTime();
   const startMs = now.getTime();
@@ -80,10 +95,10 @@ const formatTemp = (temp: number) => {
 
 // Emit for selecting a specific forecast point
 const emit = defineEmits<{
-  (e: 'selectPoint', point: any): void;
+  (e: 'selectPoint', point: TimelinePoint): void;
 }>();
 
-const selectPoint = (point: any) => {
+const selectPoint = (point: TimelinePoint) => {
   emit('selectPoint', point);
 };
 </script>

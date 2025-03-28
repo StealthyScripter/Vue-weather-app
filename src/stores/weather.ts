@@ -44,6 +44,7 @@ interface WeatherDetails {
   pressure: number;
 }
 
+
 // Helper function to safely convert to number
 function toNumber(value: string | number | undefined): number {
   if (value === undefined) return 0;

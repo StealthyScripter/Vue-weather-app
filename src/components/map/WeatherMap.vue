@@ -1,4 +1,3 @@
-<!-- WeatherMap.vue -->
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useWeatherStore } from '@/stores/weather';
@@ -7,11 +6,36 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getCityCoordinates } from '@/utils/locationUtils';
 import { geocodePlace } from '@/services/geocodingService';
-import WeatherPopup from './WeatherPopup.vue';
 import RouteWeatherTimeline from './RouteWeather.vue';
 import { getWeatherAtTime } from '@/utils/mapUtils';
 import '../../assets/mapStyles.css';
 import { useConfigStore } from '@/stores/config';
+
+
+// Define interfaces for weather data
+interface WeatherData {
+  temperature: number;
+  condition: string;
+  feelsLike?: number;
+  windspeed?: number;
+  humidity?: number;
+  winddirection?: number;
+  pressure?: number;
+  relativeHumidity?: number;
+  uvIndex?: number;
+  high?: number;
+  low?: number;
+}
+
+// Use the same interface name and structure that RouteWeatherTimeline expects
+interface TimelinePoint {
+  location: {
+    lng: number;
+    lat: number;
+  } | null;
+  time?: Date;
+  weather?: WeatherData | null;
+}
 
 // Initialize the weather store
 const weatherStore = useWeatherStore();
@@ -37,8 +61,8 @@ const isNavigationMode = ref(false);
 const startLocation = ref('');
 const endLocation = ref('');
 const routeEta = ref<Date | null>(null);
-const routePoints = ref<any[]>([]);
-const selectedPoint = ref<any>(null);
+const routePoints = ref<[number,number][]>([]);
+const selectedPoint = ref<TimelinePoint | undefined>(undefined);
 const timeInterval = ref(60); // Default 60 minutes
 
 // Weather markers for displaying forecast points
@@ -64,7 +88,9 @@ onMounted(() => {
   });
 
   map.value.on('load', () => {
-    addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+    if (currentWeather.value) {
+      addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+    }
 
     // Add navigation controls
     map.value?.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -84,7 +110,9 @@ watch(() => locationName.value, () => {
 
   // Clear all markers and add current location marker
   clearAllMarkers();
-  addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+  if (currentWeather.value) {
+    addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+  }
 });
 
 // Clear all markers from the map
@@ -97,7 +125,7 @@ const clearAllMarkers = () => {
 };
 
 // Add weather marker to map
-const addWeatherMarker = (longitude: number, latitude: number, weatherData: any, timeDisplay: string = 'Current Weather') => {
+const addWeatherMarker = (longitude: number, latitude: number, weatherData: WeatherData, timeDisplay: string = 'Current Weather') => {
   if (!map.value) return;
 
   // Create a custom element for the marker
@@ -126,7 +154,7 @@ const addWeatherMarker = (longitude: number, latitude: number, weatherData: any,
 };
 
 // Add popup to a marker
-const addPopupToMarker = (marker: mapboxgl.Marker, longitude: number, latitude: number, weatherData: any, timeDisplay: string) => {
+const addPopupToMarker = (marker: mapboxgl.Marker, longitude: number, latitude: number, weatherData: WeatherData, timeDisplay: string) => {
   if (!map.value) return;
 
   // Create popup element
@@ -199,11 +227,11 @@ const addPopupToMarker = (marker: mapboxgl.Marker, longitude: number, latitude: 
 };
 
 // Update marker content with weather info
-const updateMarkerContent = (el: HTMLElement, weatherData: any) => {
+const updateMarkerContent = (el: HTMLElement, weatherData: WeatherData) => {
   if (!weatherData) return;
 
-  let weatherCondition = weatherData.condition;
-  let temperature = weatherData.temperature;
+  const weatherCondition = weatherData.condition;
+  const temperature = weatherData.temperature;
 
   // Format temperature based on unit
   const tempUnit = temperatureUnit.value === 'celsius' ? 'C' : 'F';
@@ -247,7 +275,7 @@ const toggleNavigationMode = () => {
     endLocation.value = '';
     routeEta.value = null;
     routePoints.value = [];
-    selectedPoint.value = null;
+    selectedPoint.value = undefined;
 
     // Remove route from map if it exists
     if (map.value && map.value.getSource('route')) {
@@ -257,7 +285,9 @@ const toggleNavigationMode = () => {
 
     // Clear all markers and add current location marker
     clearAllMarkers();
-    addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+    if (currentWeather.value) {
+      addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+    }
   }
 };
 
@@ -279,7 +309,9 @@ const calculateRoute = async () => {
     const endCoords = await geocodePlace(endLocation.value);
 
     // Add marker for current location
-    addWeatherMarker(startCoords.longitude, startCoords.latitude, currentWeather.value, 'Starting Point');
+    if (currentWeather.value) {
+      addWeatherMarker(startCoords.longitude, startCoords.latitude, currentWeather.value, 'Starting Point');
+    }
 
     // Call Mapbox Directions API to get route
     const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${startCoords.longitude},${startCoords.latitude};${endCoords.longitude},${endCoords.latitude}?steps=true&geometries=geojson&access_token=${mapboxToken}`;
@@ -309,11 +341,13 @@ const calculateRoute = async () => {
       const etaWeather = getWeatherAtTime(hourlyForecast.value, routeEta.value);
       const formattedEta = routeEta.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+      const avgTemperature = (etaWeather.high + etaWeather.low)/2;
+
       if (etaWeather) {
-        const destinationWeather = {
-          temperature: etaWeather.temp,
+        const destinationWeather: WeatherData = {
+          temperature: avgTemperature,
           condition: etaWeather.condition,
-          feelsLike: etaWeather.temp // Approximation
+          feelsLike: avgTemperature // Approximation
         };
 
         addWeatherMarker(
@@ -358,12 +392,15 @@ const addRouteWeatherMarkers = async (durationInMinutes: number) => {
 
     // Get weather for this time
     const pointWeather = getWeatherAtTime(hourlyForecast.value, pointTime);
+    console.log('Point weather data:', pointWeather); 
+
+    const avgTemp = (pointWeather.high + pointWeather.low) / 2;
 
     if (pointWeather) {
-      const markerWeather = {
-        temperature: pointWeather.temp,
+      const markerWeather: WeatherData = {
+        temperature:avgTemp,
         condition: pointWeather.condition,
-        feelsLike: pointWeather.temp // Approximation
+        feelsLike: avgTemp // Approximation
       };
 
       // Add marker at this point
@@ -426,7 +463,7 @@ const drawRoute = () => {
 };
 
 // Handle selection of a point from the timeline
-const handlePointSelect = (point: any) => {
+const handlePointSelect = (point: TimelinePoint) => {
   if (!map.value || !point.location) return;
 
   selectedPoint.value = point;
@@ -441,6 +478,7 @@ const handlePointSelect = (point: any) => {
   // Find relevant marker and trigger its click event
   const marker = weatherMarkers.value.find(m => {
     const lngLat = m.getLngLat();
+    if (!point.location) return false;
     return Math.abs(lngLat.lng - point.location.lng) < 0.01 &&
            Math.abs(lngLat.lat - point.location.lat) < 0.01;
   });
@@ -485,7 +523,7 @@ const handlePointSelect = (point: any) => {
 
         <div class="input-group">
           <label for="time-interval">Interval (min):</label>
-          <select id="time-interval" @change="setCustomInterval(parseInt($event.target.value))">
+          <select id="time-interval" @change="e => setCustomInterval(parseInt((e.target as HTMLSelectElement).value))">
             <option value="30">30 min</option>
             <option value="60" selected>1 hour</option>
             <option value="120">2 hours</option>
@@ -502,7 +540,7 @@ const handlePointSelect = (point: any) => {
         :etaTime="routeEta"
         :routeDuration="routeEta ? (routeEta.getTime() - new Date().getTime()) / 60000 : 0"
         :timeInterval="timeInterval"
-        @selectPoint="handlePointSelect"
+        :selectPoint="handlePointSelect"
       />
     </div>
 
