@@ -24,6 +24,9 @@ interface HourlyForecast {
   high:number;
   icon: number;
   condition: string;
+  humidity?: number | undefined,
+  windspeed?: number | undefined,
+  winddirection?: number | undefined
 }
 
 interface DailyForecast {
