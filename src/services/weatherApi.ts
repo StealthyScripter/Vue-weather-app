@@ -220,7 +220,9 @@ export const processDailyForecast = (data: WeatherApiResponse): DailyForecast[] 
 }
 
 // Helper function to get wind direction from degrees
-export const getWindDirection = (degrees: number): string => {
+export const getWindDirection = (degrees?: number | undefined): string => {
+  if (degrees === undefined) return '';
+  
   const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const index = Math.round(degrees / 45) % 8;
   return directions[index];

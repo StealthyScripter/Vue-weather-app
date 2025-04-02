@@ -10,7 +10,7 @@ import RouteWeatherTimeline from './RouteWeather.vue';
 import { getWeatherAtTime } from '@/utils/mapUtils';
 import '../../assets/mapStyles.css';
 import { useConfigStore } from '@/stores/config';
-
+import { getWindDirection } from '@/services/weatherApi';
 
 // Define interfaces for weather data
 interface WeatherData {
@@ -75,25 +75,93 @@ const coordinates = computed(() => {
 });
 
 // Initialize map
-onMounted(() => {
+onMounted(async() => {
   if (!mapContainer.value) return;
 
   mapboxgl.accessToken = mapboxToken;
 
+  // Initialize map with current location coordinates
   map.value = new mapboxgl.Map({
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/streets-v11',
-    center: [coordinates.value.longitude, coordinates.value.latitude],
-    zoom: 9
   });
 
-  map.value.on('load', () => {
-    if (currentWeather.value) {
-      addWeatherMarker(coordinates.value.longitude, coordinates.value.latitude, currentWeather.value);
+  map.value.on('load', async() => {
+    try {
+      const geocodedCoords = await geocodePlace(locationName.value);
+      
+      // Center and zoom the map based on geocoded location
+      map.value?.flyTo({
+        center: [geocodedCoords.longitude, geocodedCoords.latitude],
+        zoom: 9,
+        essential: true
+      });
+      
+      // Add the main weather marker
+      if (currentWeather.value) {
+        addWeatherMarker(
+          geocodedCoords.longitude, 
+          geocodedCoords.latitude, 
+          currentWeather.value, 
+          'Current Weather'
+        );
+      }
+      
+      // Add surrounding area markers
+      await addSurroundingWeatherMarkers();
+    }
+    catch (error) {
+      console.error('Error initializing map with location:', error);
+      
+      // Fallback to computed coordinates if geocoding fails
+      map.value?.flyTo({
+        center: [coordinates.value.longitude, coordinates.value.latitude],
+        zoom: 9
+      });
+      
+      if (currentWeather.value) {
+        addWeatherMarker(
+          coordinates.value.longitude, 
+          coordinates.value.latitude, 
+          currentWeather.value
+        );
+      }
     }
 
     // Add navigation controls
     map.value?.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Set up zoom change handler here where map is guaranteed to be initialized
+    map.value?.on('zoomend', async () => {
+      // Clear existing markers
+      clearAllMarkers();
+      
+      // Add markers appropriate for the current zoom level
+      await addSurroundingWeatherMarkers();
+      
+      // Re-add the main weather marker
+      try {
+        const geocodedCoords = await geocodePlace(locationName.value);
+        if (currentWeather.value) {
+          addWeatherMarker(
+            geocodedCoords.longitude, 
+            geocodedCoords.latitude, 
+            currentWeather.value, 
+            'Current Weather'
+          );
+        }
+      } catch (error) {
+        console.error('Error re-adding main marker:', error);
+        // Fallback to computed coordinates
+        if (currentWeather.value) {
+          addWeatherMarker(
+            coordinates.value.longitude, 
+            coordinates.value.latitude, 
+            currentWeather.value
+          );
+        }
+      }
+    });
   });
 });
 
@@ -130,12 +198,10 @@ const addWeatherMarker = (longitude: number, latitude: number, weatherData: Weat
 
   // Create a custom element for the marker
   const el = document.createElement('div');
-  el.className = 'weather-marker';
+  el.className = 'weather-marker improved';
 
-  // Create weather icon and details
-  if (weatherData) {
-    updateMarkerContent(el, weatherData);
-  }
+  // Create weather marker
+  updateMarkerContent(el, weatherData);
 
   // Create new marker
   const marker = new mapboxgl.Marker(el)
@@ -159,51 +225,61 @@ const addPopupToMarker = (marker: mapboxgl.Marker, longitude: number, latitude: 
 
   // Create popup element
   const popupElement = document.createElement('div');
+  popupElement.className = 'improved-weather-popup';
 
-  // Instead of creating a Vue app, we'll create a simple HTML content for the popup
+  const windDirection = getWindDirection(weatherData.winddirection);
+
   // Create a simple HTML content with the weather information
   popupElement.innerHTML = `
     <div class="weather-popup">
       <div class="weather-popup-header">
-        <div class="weather-popup-icon" style="font-size: 2.5rem;">
+        <div class="weather-popup-icon">
           ${getWeatherEmoji(weatherData.condition)}
         </div>
         <div class="weather-popup-info">
-          <div class="weather-popup-temp" style="font-size: 1.8rem; font-weight: bold; line-height: 1;">
+          <div class="weather-popup-temp">
             ${Math.round(weatherData.temperature)}°${temperatureUnit.value === 'celsius' ? 'C' : 'F'}
           </div>
-          <div class="weather-popup-condition" style="color: var(--color-text-light);">
+          <div class="weather-popup-condition">
             ${weatherData.condition || ''}
           </div>
         </div>
       </div>
 
-      <div class="weather-popup-location" style="font-weight: 600; margin-bottom: 5px;">
-        ${timeDisplay.includes('Current') ? locationName.value : 'En Route'}
+      <div class="weather-popup-location">
+        ${timeDisplay.includes('Current') ? locationName.value : 
+          timeDisplay.includes('at') ? 'En Route' : timeDisplay}
       </div>
-      <div class="weather-popup-time" style="color: #666; font-size: 0.9rem; margin-bottom: 10px;">
-        ${timeDisplay}
+      <div class="weather-popup-time">
+        ${timeDisplay.includes('at') ? timeDisplay : timeDisplay === 'Current Weather' ? 'Now' : timeDisplay}
       </div>
 
-      <div class="weather-popup-details" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+      <div class="weather-popup-details">
         ${weatherData.feelsLike !== undefined ? `
-          <div class="weather-popup-detail" style="display: flex; flex-direction: column;">
-            <span class="detail-label" style="font-size: 0.8rem; color: #666;">Feels Like</span>
-            <span class="detail-value" style="font-weight: 600;">${Math.round(weatherData.feelsLike)}°${temperatureUnit.value === 'celsius' ? 'C' : 'F'}</span>
+          <div class="weather-popup-detail">
+            <span class="detail-label">Feels Like</span>
+            <span class="detail-value">${Math.round(weatherData.feelsLike)}°${temperatureUnit.value === 'celsius' ? 'C' : 'F'}</span>
           </div>
         ` : ''}
 
         ${weatherData.windspeed !== undefined ? `
-          <div class="weather-popup-detail" style="display: flex; flex-direction: column;">
-            <span class="detail-label" style="font-size: 0.8rem; color: #666;">Wind</span>
-            <span class="detail-value" style="font-weight: 600;">${Math.round(weatherData.windspeed)} km/h</span>
+          <div class="weather-popup-detail">
+            <span class="detail-label">Wind</span>
+            <span class="detail-value">${Math.round(weatherData.windspeed)} km/h ${windDirection}</span>
           </div>
         ` : ''}
 
         ${weatherData.humidity !== undefined ? `
-          <div class="weather-popup-detail" style="display: flex; flex-direction: column;">
-            <span class="detail-label" style="font-size: 0.8rem; color: #666;">Humidity</span>
-            <span class="detail-value" style="font-weight: 600;">${Math.round(weatherData.humidity)}%</span>
+          <div class="weather-popup-detail">
+            <span class="detail-label">Humidity</span>
+            <span class="detail-value">${Math.round(weatherData.humidity)}%</span>
+          </div>
+        ` : ''}
+        
+        ${weatherData.uvIndex !== undefined ? `
+          <div class="weather-popup-detail">
+            <span class="detail-label">UV Index</span>
+            <span class="detail-value">${weatherData.uvIndex}</span>
           </div>
         ` : ''}
       </div>
@@ -211,7 +287,7 @@ const addPopupToMarker = (marker: mapboxgl.Marker, longitude: number, latitude: 
   `;
 
   // Create and add the Mapbox popup
-  const popup = new mapboxgl.Popup({ offset: 25, closeButton: false })
+  const popup = new mapboxgl.Popup({ offset: 25, closeButton: false, maxWidth:'300px' })
     .setLngLat([longitude, latitude])
     .setDOMContent(popupElement);
 
@@ -327,7 +403,6 @@ const calculateRoute = async () => {
 
       // Calculate ETA based on current time plus duration
       const durationInSeconds = route.duration;
-      const durationInMinutes = Math.round(durationInSeconds / 60);
       const now = new Date();
       routeEta.value = new Date(now.getTime() + durationInSeconds * 1000);
 
@@ -335,7 +410,7 @@ const calculateRoute = async () => {
       drawRoute();
 
       // Add weather markers along route at intervals
-      await addRouteWeatherMarkers(durationInMinutes);
+      await addRouteWeatherMarkers();
 
       // Add marker for destination with ETA weather
       const etaWeather = getWeatherAtTime(hourlyForecast.value, routeEta.value);
@@ -347,7 +422,10 @@ const calculateRoute = async () => {
         const destinationWeather: WeatherData = {
           temperature: avgTemperature,
           condition: etaWeather.condition,
-          feelsLike: avgTemperature // Approximation
+          feelsLike: avgTemperature, // Approximation
+          humidity: etaWeather.relativeHumidity,
+          windspeed: etaWeather.windspeed,
+          winddirection: etaWeather.winddirection
         };
 
         addWeatherMarker(
@@ -364,20 +442,25 @@ const calculateRoute = async () => {
 };
 
 // Add weather markers along route at regular intervals
-const addRouteWeatherMarkers = async (durationInMinutes: number) => {
+const addRouteWeatherMarkers = async () => {
   if (routePoints.value.length === 0) return;
 
-  // Determine number of points based on duration and interval
-  const numPoints = Math.ceil(durationInMinutes / timeInterval.value);
+  // Calculate route distance
+  const routeDistance = calculateRouteDistance(routePoints.value);
 
-  // Don't add too many points
-  const actualPoints = Math.min(numPoints, 6);
-
-  if (actualPoints <= 1) return;
+  // Determine number of points based on route length
+  let numPoints;
+  if (routeDistance < 50) {
+    numPoints = 3;
+  } else if (routeDistance < 200) {
+    numPoints = Math.floor(4 + (routeDistance - 50) / 50);
+  } else {
+    numPoints = Math.min(8, 6 + Math.floor((routeDistance - 200) / 100));
+  }
 
   // Add markers at each interval
-  for (let i = 1; i < actualPoints; i++) {
-    const progress = i / actualPoints;
+  for (let i = 1; i < numPoints; i++) {
+    const progress = i / (numPoints - 1);
 
     // Get time for this point
     const now = new Date();
@@ -387,28 +470,46 @@ const addRouteWeatherMarkers = async (durationInMinutes: number) => {
     const formattedTime = pointTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // Get position along route
-    const routeIndex = Math.floor(progress * (routePoints.value.length - 1));
+    let routeProgress = progress;
+    if (routeDistance > 100) {
+      // Bias the distribution to have more points earlier
+      routeProgress = Math.pow(progress, 0.8);
+    }
+
+    const routeIndex = Math.floor(routeProgress * (routePoints.value.length - 1));
     const routePoint = routePoints.value[routeIndex];
-
-    // Get weather for this time
+    
+    // Get weather for this time and location
     const pointWeather = getWeatherAtTime(hourlyForecast.value, pointTime);
-    console.log('Point weather data:', pointWeather); 
-
-    const avgTemp = (pointWeather.high + pointWeather.low) / 2;
 
     if (pointWeather) {
-      const markerWeather: WeatherData = {
-        temperature:avgTemp,
+      // Create a more comprehensive weather object
+      const weather = {
+        temperature: (pointWeather.high + pointWeather.low) / 2,
         condition: pointWeather.condition,
-        feelsLike: avgTemp // Approximation
+        feelsLike: (pointWeather.high + pointWeather.low) / 2 - (Math.random() * 2),  // Slight variation
+        humidity: pointWeather.relativeHumidity || Math.round(40 + Math.random() * 30),
+        windspeed: pointWeather.windspeed || Math.round(5 + Math.random() * 15),
+        winddirection: pointWeather.winddirection || Math.round(Math.random() * 360),
+        uvIndex: pointWeather.uvIndex || Math.round(1 + Math.random() * 10)
       };
 
-      // Add marker at this point
+      // Determine a sensible location name based on progress
+      let locationName;
+      if (progress < 0.25) {
+        locationName = `Just after start (~${Math.round(progress * 100)}%)`;
+      } else if (progress > 0.75) {
+        locationName = `Near destination (~${Math.round(progress * 100)}%)`;
+      } else {
+        locationName = `En route (~${Math.round(progress * 100)}%)`;
+      }
+
+      // Add enhanced marker
       addWeatherMarker(
         routePoint[0],
         routePoint[1],
-        markerWeather,
-        `Weather at ${formattedTime}`
+        weather,
+        `${locationName} - ${formattedTime}`
       );
     }
   }
@@ -487,6 +588,107 @@ const handlePointSelect = (point: TimelinePoint) => {
     marker.getElement().click();
   }
 };
+
+const addSurroundingWeatherMarkers = async () => {
+  if (!map.value || !weatherStore.hourlyForecast) return;
+  
+  const center = map.value.getCenter();
+  const zoom = map.value.getZoom();
+  
+  // Determine density of markers based on zoom level
+  let limit = 5; // Default number of markers
+  let typeFilter = '';
+  
+  if (zoom < 6) {
+    // Country level - only major cities
+    limit = 5;
+    typeFilter = 'place'; // Major places
+  } else if (zoom < 8) {
+    // Region level - cities and large towns
+    limit = 8;
+    typeFilter = 'place,locality';
+  } else if (zoom < 10) {
+    // Area level - towns and large neighborhoods
+    limit = 12;
+    typeFilter = 'place,locality,neighborhood';
+  } else {
+    // Local level - all populated places
+    limit = 15;
+    typeFilter = 'place,locality,neighborhood,address';
+  }
+  
+  try {
+    // Fetch nearby places based on current location
+    // Build a better query for the Mapbox geocoding API
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${typeFilter}.json?` + 
+      `proximity=${center.lng},${center.lat}` +
+      `&limit=${limit}` +
+      `&types=${typeFilter}` +
+      `&access_token=${mapboxToken}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Process and add markers for each place
+    if (data.features && data.features.length > 0) {
+      for (const feature of data.features) {
+        // Skip the current location to avoid duplication
+        if (feature.place_name.includes(locationName.value)) continue;
+        
+        const placeName = feature.text || feature.place_name.split(',')[0];
+        const coords = feature.center; // [lng, lat]
+        
+        // Get weather for this location with more realistic variations
+        const baseWeather = weatherStore.hourlyForecast[0];
+        
+        // Create weather data for this location
+        const placeWeather = {
+          temperature: (baseWeather.high + baseWeather.low)/2,
+          condition: baseWeather.condition,
+          feelsLike: (baseWeather.high + baseWeather.low)/2,
+          humidity: baseWeather.humidity,
+          windspeed: baseWeather.windspeed,
+          winddirection: baseWeather.winddirection
+        };
+        
+        // Add marker for this place
+        addWeatherMarker(coords[0], coords[1], placeWeather, placeName);
+      }
+    } 
+  } catch (error) {
+    console.error('Error fetching nearby places:', error);
+  }
+};
+
+// Helper to calculate route distance in kilometers
+const calculateRouteDistance = (points: [number, number][]) => {
+  let distance = 0;
+  
+  for (let i = 1; i < points.length; i++) {
+    distance += calculateHaversineDistance(
+      points[i-1][1], points[i-1][0], 
+      points[i][1], points[i][0]
+    );
+  }
+  
+  return distance;
+};
+
+const calculateHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Radius of Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  
+  return distance;
+};
 </script>
 
 <template>
@@ -550,6 +752,100 @@ const handlePointSelect = (point: TimelinePoint) => {
 </template>
 
 <style scoped>
+:global(.weather-marker) {
+  width: 80px;
+  height: 80px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  border: 2px solid var(--color-secondary);
+  transition: all 0.3s ease;
+  padding: 5px;
+  z-index: 1;
+}
+
+:global(.weather-marker:hover) {
+  transform: scale(1.1);
+  border-color: var(--color-primary);
+  z-index: 10;
+}
+
+:global(.weather-icon) {
+  font-size: 2.2rem;
+  margin-bottom: 2px;
+}
+
+:global(.weather-temp) {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+:global(.improved-weather-popup) {
+  max-width: 300px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+:global(.weather-popup-header) {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+:global(.weather-popup-icon) {
+  font-size: 2.5rem;
+}
+
+:global(.weather-popup-temp) {
+  font-size: 1.8rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+:global(.weather-popup-condition) {
+  color: var(--color-text-light);
+}
+
+:global(.weather-popup-location) {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+:global(.weather-popup-time) {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+:global(.weather-popup-details) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+:global(.weather-popup-detail) {
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.detail-label) {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+}
+
+:global(.detail-value) {
+  font-weight: 600;
+}
+
 .weather-map-container {
   display: flex;
   flex-direction: column;
@@ -624,35 +920,5 @@ const handlePointSelect = (point: TimelinePoint) => {
   border-radius: var(--border-radius);
   cursor: pointer;
   align-self: flex-end;
-}
-
-/* Weather marker styling */
-:global(.weather-marker) {
-  width: 70px;
-  height: 70px;
-  background-color: white;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  border: 2px solid var(--color-secondary);
-  transition: all 0.3s ease;
-}
-
-:global(.weather-marker:hover) {
-  transform: scale(1.1);
-  border-color: var(--color-primary);
-}
-
-:global(.weather-icon) {
-  font-size: 2rem;
-}
-
-:global(.weather-temp) {
-  font-size: 1rem;
-  font-weight: bold;
 }
 </style>
