@@ -37,7 +37,7 @@ const config: IConfig = {
   
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   
-  jwtSecret: process.env.JWT_SECRET || 'default_secret_key_for_dev',
+  jwtSecret: process.env.JWT_SECRET as string || 'default_secret_key_for_dev',
   jwtExpiry: process.env.JWT_EXPIRY || '24h',
   
   cacheTTL: parseInt(process.env.CACHE_TTL || '300', 10),

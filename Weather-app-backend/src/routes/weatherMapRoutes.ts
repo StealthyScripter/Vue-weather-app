@@ -100,7 +100,7 @@ router.get('/nearby', async (req, res) => {
 });
 
 // Calculate route with weather
-router.post('/route', async (req, res) => {
+router.post('/route', async (req: express.Request, res: express.Response): Promise<any> => {
   try {
     const { start, end, options } = req.body;
     
