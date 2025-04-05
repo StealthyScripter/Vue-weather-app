@@ -7,11 +7,10 @@ import config from './config';
 import logger from './utils/logger';
 import weatherMapRoutes from './routes/weatherMapRoutes';
 import authRoutes from './routes/authRoutes';
-
-
-
-
-
+import analyticsRoutes from './routes/analyticsRoute';
+import systemRoutes from './routes/systemRoutes';
+import { errorHandler } from './middlewares/errorMiddleware';
+import { trackRequest } from './middlewares/analyticsMiddleware';
 
 // Basic Express app setup
 const app = express();
@@ -21,7 +20,7 @@ app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
 app.use(cors()); // Allow cross-origin requests
 app.use(express.json()); // Parse JSON request bodies
-app.use('/api/auth', authRoutes); // Register auth routes
+app.use(trackRequest);// Add analytics tracking
 
 // Protect weather map routes with authentication - fixed version
 import { authenticate } from './utils/authMiddleware';
@@ -39,7 +38,10 @@ app.use((req, res, next) => {
 });
 
 // Register routes
+app.use('/api/auth', authRoutes);
 app.use('/api/weather-map', weatherMapRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/system', systemRoutes);
 
 // Simple health check endpoint
 app.get('/api/health', (req, res) => {
@@ -51,15 +53,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error(`Unhandled error: ${err.message}`, { stack: err.stack });
-  
-  res.status(500).json({
-    success: false,
-    error: config.nodeEnv === 'production' ? 'Internal server error' : err.message,
-    timestamp: new Date()
-  });
-});
+app.use(errorHandler);
 
 // Handle 404 errors
 app.use((req, res) => {

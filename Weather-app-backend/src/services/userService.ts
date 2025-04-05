@@ -11,7 +11,7 @@ const users = [
   {
     id: '1',
     email: 'admin@gmail.com',
-    password: '$2b$10$yjHOWZu7Pg7TJmkI9uiDre83hXw3uIpDG.sBFkCZQlK5.bDOQEa52', // 'admin123'
+    password: '$2b$10$NbWc.K32MW9IWTu/AmPDbul5S7q1.q3Esfvfko7MQ5AOYiD3czhNK', // 'admin123'
     role: 'admin'
   },
   {

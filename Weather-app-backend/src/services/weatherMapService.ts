@@ -5,7 +5,8 @@ import { OSMGeocodingProvider } from '../providers/geocoding/osmProvider';
 import { ILogger } from '../utils/logger';
 import logger from '../utils/logger';
 import config from '../config';
-
+import { globalCache } from './cacheService';
+ 
 // Interface for a point along a route with weather data
 export interface IWeatherPoint {
   coordinates: [number, number]; // [longitude, latitude]
@@ -56,8 +57,22 @@ export class WeatherMapService {
    * @param location Location name or coordinates
    */
   public async getWeatherForLocation(location: string | ICoordinates): Promise<IDetailedWeatherData> {
-    try {
-      return await this.weatherProvider.getCurrentWeather(location);
+      try {
+        //Create a cache key
+        const cacheKey = `weather_${typeof location === 'string' ? location : `${location.latitude},${location.longitude}`}`;
+      
+        // Check cache first
+      const cachedData = await globalCache.get<IDetailedWeatherData>(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+      // Get from provider if not in cache
+      const weatherData = await this.weatherProvider.getCurrentWeather(location);    
+      // Cache the result (expires in 30 minutes for current weather)
+      await globalCache.set(cacheKey, weatherData, { ttl: 1800 });
+
+      return weatherData;
+
     } catch (error) {
       this.logger.error(`Error getting weather for location: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
