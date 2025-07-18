@@ -1,4 +1,3 @@
-// src/middlewares/analyticsMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import { analyticsService } from '../services/analyticsService';
 

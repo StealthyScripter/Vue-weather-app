@@ -31,4 +31,41 @@ coverage
 *.sln
 *.sw?
 
-*.tsbuildinfo
+*.tsbuildinfo# Node modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js build output
+.next/
+out/
+
+# Production build
+dist/
+
+# Vercel deployment
+.vercel/
+
+# Local env files
+.env*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+
+# Optional: ignore coverage output if using Jest
+coverage
+
+# Optional: ignore Express log or temp files
+*.log
+tmp/
+

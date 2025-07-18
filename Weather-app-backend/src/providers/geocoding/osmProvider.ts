@@ -1,4 +1,3 @@
-// src/providers/geocoding/osmProvider.ts
 import { ApiClient, QueryParams } from '../../utils/apiClient';
 import { IRateLimiter, FixedWindowRateLimiter } from '../../utils/rateLimiter';
 import { ILogger } from '../../utils/logger';

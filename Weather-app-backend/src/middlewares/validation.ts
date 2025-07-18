@@ -1,4 +1,3 @@
-// src/middlewares/validation.ts
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from './errorHandler';
 
