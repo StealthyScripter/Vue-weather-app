@@ -4,9 +4,20 @@ const PORT = 3000;
 
 app.use(express.json());
 
+//Register routes
+const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const locationRoutes = require('./routes/location');
+const navigationRoutes = require('./routes/navigation');
+const routeWeatherRoutes = require('./routes/route-weather');
+const weatherRoutes = require('./routes/weather');
 
-app.use('/api/user/', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/api/navigation', navigationRoutes);
+app.use('/api/route-weather', routeWeatherRoutes);
+app.use('/api/weather', weatherRoutes);
 
 //Root endpoint
 app.get('/', (req, res) => {
