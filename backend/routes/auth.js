@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const UserService = require('../services/userServices');
+const AuthUtils = require('../utils/authUtils');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
@@ -176,12 +177,37 @@ router.post('/signup', async (req, res) => {
 });
 
 //User logout
-router.post('/logout', (req, res) => {
-    // In a real implementation, you'd blacklist the token or remove it from a whitelist
-    return res.json({
-        success: true,
-        message: 'Successfully logged out'
-    });
+router.post('/logout', async(req, res) => {
+    const { refresh_token } = req.body;
+
+    if (!refresh_token) {
+        return res.status(400).json({
+            success: false,
+            error: {
+                code: 'MISSING_REFRESH_TOKEN',
+                message: 'Refresh token is required'
+            }
+        });
+    }
+
+    try {
+        await AuthUtils.addToTokenBlacklist(refresh_token);
+
+        return res.json({
+            success: true,
+            message: 'successfully logged out'
+        });
+
+    } catch(error) {
+        console.error('Error during logout', error);
+        return res.status(500).json({
+            success:false,
+            error: {
+                code: 'LOGOUT_ERROR',
+                message: 'Failed to logout'
+            }
+        });
+    }
 });
 
 //Refresh access token
@@ -236,6 +262,7 @@ router.post('/refresh', async (req, res) => {
 });
 
 //Password reset request
+// In routes/auth.js - Password reset methods need actual implementation
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
 
@@ -250,15 +277,21 @@ router.post('/forgot-password', async (req, res) => {
     }
 
     try {
-        // Check if user exists (but don't reveal if they don't for security)
         const user = await UserService.findUserByEmail(email);
         
         if (user) {
-            // In a real implementation, you'd:
-            // 1. Generate a reset token
-            // 2. Save it to database with expiration
-            // 3. Send email with reset link
-            console.log(`Password reset requested for: ${email}`);
+            // PRODUCTION IMPLEMENTATION NEEDED
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+            // Store reset token in database
+            await db.none(`
+                INSERT INTO password_reset_tokens (user_id, token, expires_at)
+                VALUES ($1, $2, $3)
+            `, [user.id, resetToken, expiresAt]);
+
+            // Send email with reset link
+            AuthUtils.sendPasswordResetEmail(user.email, resetToken);
         }
 
         // Always return success to prevent email enumeration
@@ -279,7 +312,6 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-//Reset password with token
 router.post('/reset-password', async (req, res) => {
     const { token, new_password, confirm_password } = req.body;
 
@@ -314,12 +346,47 @@ router.post('/reset-password', async (req, res) => {
     }
 
     try {
-        // In a real implementation, you'd:
-        // 1. Verify the reset token from database
-        // 2. Check if it's not expired
-        // 3. Hash the new password
-        // 4. Update user's password
-        // 5. Invalidate the reset token
+        // PRODUCTION IMPLEMENTATION NEEDED
+        // Verify the reset token from database
+        const tokenData = await db.oneOrNone(`
+            SELECT user_id, expires_at 
+            FROM password_reset_tokens 
+            WHERE token = $1 AND used_at IS NULL
+        `, [token]);
+
+        if (!tokenData) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_TOKEN',
+                    message: 'Invalid or expired reset token'
+                }
+            });
+        }
+
+        // Check if token is expired
+        if (new Date() > tokenData.expires_at) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'EXPIRED_TOKEN',
+                    message: 'Reset token has expired'
+                }
+            });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(new_password, 10);
+
+        // Update user's password
+        await UserService.updateUser(tokenData.user_id, { password: hashedPassword });
+
+        // Mark token as used
+        await db.none(`
+            UPDATE password_reset_tokens 
+            SET used_at = NOW() 
+            WHERE token = $1
+        `, [token]);
 
         return res.json({
             success: true,
@@ -337,4 +404,5 @@ router.post('/reset-password', async (req, res) => {
         });
     }
 });
+
 module.exports = router;
