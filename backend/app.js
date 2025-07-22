@@ -158,7 +158,7 @@ app.use('/api/location', [
 ], locationRoutes);
 app.use('/api/routes', ...middleware.routeEndpoints, navigationRoutes);
 app.use('/api/route-weather', [
-    ...middleware.protectedEndpoints,
+    ...middleware.publicEndpoints,
     ...(middleware.validateRoute ? [middleware.validateRoute] : [])
 ], routeWeatherRoutes);
 app.use('/api/user', [
