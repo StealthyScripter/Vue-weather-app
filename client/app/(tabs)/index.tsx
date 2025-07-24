@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { WeatherCard } from '../components/WeatherCard';
-import { MetricCard } from '../components/MetricCard';
-import { ForecastItem } from '../components/ForecastItem';
+import { WeatherCard } from '../../components/WeatherCard';
+import { MetricCard } from '../../components/MetricCard';
+import { ForecastItem } from '../../components/ForecastItem';
 
 export default function WeatherDashboard() {
   const forecastData = [

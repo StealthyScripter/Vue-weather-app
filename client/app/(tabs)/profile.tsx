@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { router } from 'expo-router';
 
 export default function Profile() {
   const handleSignOut = () => {
@@ -8,7 +9,11 @@ export default function Profile() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: () => router.replace('/')
+        },
       ]
     );
   };
