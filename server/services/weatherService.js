@@ -32,7 +32,7 @@ class WeatherService {
                 current: {
                     temperature: Math.round(data.main.temp),
                     feels_like: Math.round(data.main.feels_like),
-                    condition: this.mapWeatherCondition(data.weather[0].main),
+                    condition: mapWeatherCondition(data.weather[0].main),
                     condition_text: data.weather[0].description,
                     humidity: data.main.humidity,
                     wind_speed: Math.round(data.wind.speed),
@@ -208,7 +208,7 @@ class WeatherService {
                     day: this.getDayName(date),
                     high_temp: item.main.temp_max,
                     low_temp: item.main.temp_min,
-                    condition: this.mapWeatherCondition(item.weather[0].main),
+                    condition: mapWeatherCondition(item.weather[0].main),
                     condition_text: item.weather[0].description,
                     precipitation_chance: Math.round((item.pop || 0) * 100),
                     wind_speed: Math.round(item.wind.speed),
