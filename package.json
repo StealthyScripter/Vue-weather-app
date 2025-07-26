@@ -1,0 +1,77 @@
+{
+  "name": "weatherroute-ai",
+  "version": "1.0.0",
+  "description": "WeatherRoute AI - Smart Weather Predictions for Route Planning",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "client",
+      "server"
+    ]
+  },
+  "scripts": {
+    "setup": "npm run install:all",
+    "install:all": "npm run install:client && npm run install:server",
+    "install:client": "cd client && npm install",
+    "install:server": "cd server && npm install",
+    
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\"",
+    "dev:client": "cd client && npm start",
+    "dev:server": "cd server && npm run dev",
+    
+    "start": "npm run start:full",
+    "start:full": "concurrently \"npm run start:server\" \"npm run start:client\" --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\"",
+    "start:client": "cd client && npm start",
+    "start:server": "cd server && npm start",
+    
+    "db:setup": "cd server && npm run db:start",
+    "db:start": "cd server && npm run db:start",
+    "db:stop": "cd server && npm run db:stop",
+    "db:reset": "cd server && npm run db:reset",
+    "db:logs": "cd server && npm run db:logs",
+    "db:shell": "cd server && npm run db:shell",
+    
+    "client:android": "cd client && npm run android",
+    "client:ios": "cd client && npm run ios",
+    "client:web": "cd client && npm run web",
+    "client:lint": "cd client && npm run lint",
+    "client:reset": "cd client && npm run reset-project",
+    
+    "clean": "npm run clean:all",
+    "clean:all": "npm run clean:client && npm run clean:server && npm run clean:root",
+    "clean:client": "cd client && rm -rf node_modules package-lock.json",
+    "clean:server": "cd server && rm -rf node_modules package-lock.json",
+    "clean:root": "rm -rf node_modules package-lock.json",
+    
+    "fresh-install": "npm run clean:all && npm run install:all",
+    
+    "health": "concurrently \"curl -s http://localhost:3000/health || echo 'Server not running'\" \"curl -s http://localhost:8081 || echo 'Client not running'\" --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\"",
+    
+    "prod:build": "cd client && npm run build 2>/dev/null || echo 'No build script for client'",
+    "prod:start": "cd server && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/weatherroute-ai.git"
+  },
+  "keywords": [
+    "weather",
+    "route-planning",
+    "ai",
+    "react-native",
+    "expo",
+    "node.js",
+    "express"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "readme": "README.md"
+}
