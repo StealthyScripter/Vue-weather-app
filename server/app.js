@@ -1,5 +1,8 @@
 require('dotenv').config();
 const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 
 console.log('🚀 Starting WeatherRoute AI...');
 
@@ -102,14 +105,56 @@ if (helmet) {
     }));
 }
 
-// CORS configuration (if available)
+// CORS configuration
 if (cors) {
+    const allowedOrigins = [
+        'http://localhost:8081',    // Expo web development
+        'http://localhost:19006',   // Expo web alternative port
+        'exp://localhost:8081',     // Expo mobile development
+        'http://localhost:3000',    // Frontend if served from same port
+        'http://localhost:5000',
+        process.env.FRONTEND_URL    // Custom frontend URL from env
+    ].filter(Boolean);
     app.use(cors({
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: function (origin, callback) {
+            // Allow requests with no origin (mobile apps, Postman, etc.)
+            if (!origin) return callback(null, true);
+            
+            // Check if origin is in allowed list
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            
+            // In development, be more permissive
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`⚠️  CORS: Allowing origin in development: ${origin}`);
+                return callback(null, true);
+            }
+            
+            callback(new Error('Not allowed by CORS'));
+        },
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        optionsSuccessStatus: 200 // For legacy browser support
     }));
+
+        console.log('✅ CORS configured for origins:', allowedOrigins);
+    } else {
+        // Basic CORS fallback
+        app.use((req, res, next) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+            res.header('Access-Control-Allow-Credentials', 'true');
+            
+            if (req.method === 'OPTIONS') {
+                res.sendStatus(200);
+            } else {
+                next();
+            }
+        });
+        console.log('✅ Basic CORS fallback enabled');
 }
 
 // Body parsing middleware

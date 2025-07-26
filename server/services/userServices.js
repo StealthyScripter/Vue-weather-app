@@ -348,6 +348,93 @@ class UserService {
             throw error;
         }
     }
+
+    static async updateUserPassword(userId, hashedPassword) {
+        try {
+            const result = await db.one(`
+                UPDATE users 
+                SET password = $1, updated_at = NOW() 
+                WHERE id = $2 
+                RETURNING id, email, full_name, created_at, updated_at
+            `, [hashedPassword, userId]);
+            
+            return result;
+        } catch (error) {
+            console.error('Error updating user password:', error);
+            throw new Error('Failed to update password');
+        }
+    }
+
+    static async updateUser(userId, updateData) {
+        try {
+            const fields = [];
+            const values = [];
+            let paramIndex = 1;
+
+            // Build dynamic update query
+            for (const [key, value] of Object.entries(updateData)) {
+                if (key === 'id') continue; // Don't allow ID updates
+                fields.push(`${key} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+
+            if (fields.length === 0) {
+                throw new Error('No valid fields to update');
+            }
+
+            fields.push(`updated_at = NOW()`);
+            values.push(userId);
+
+            const query = `
+                UPDATE users 
+                SET ${fields.join(', ')}
+                WHERE id = $${paramIndex}
+                RETURNING id, email, full_name, created_at, updated_at
+            `;
+
+            const result = await db.one(query, values);
+            return result;
+        } catch (error) {
+            console.error('Error updating user:', error);
+            throw new Error('Failed to update user');
+        }
+    }
+
+    static async deleteUser(userId) {
+        try {
+            await db.none('DELETE FROM users WHERE id = $1', [userId]);
+            return true;
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            throw new Error('Failed to delete user');
+        }
+    }
+
+    static async getUserById(userId) {
+        try {
+            const user = await db.oneOrNone(`
+                SELECT id, email, full_name, created_at, updated_at 
+                FROM users 
+                WHERE id = $1
+            `, [userId]);
+            
+            return user;
+        } catch (error) {
+            console.error('Error fetching user by ID:', error);
+            throw new Error('Failed to fetch user');
+        }
+    }
+
+    static async validateUserExists(userId) {
+        try {
+            const user = await db.oneOrNone('SELECT id FROM users WHERE id = $1', [userId]);
+            return !!user;
+        } catch (error) {
+            console.error('Error validating user existence:', error);
+            return false;
+        }
+    }
 }
 
 module.exports = UserService;
