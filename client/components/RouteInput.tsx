@@ -120,7 +120,8 @@
 //   },
 // });
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 
 interface RouteInputProps {
@@ -137,11 +138,39 @@ export function RouteInput({ initialData, onChange }: RouteInputProps) {
   const [to, setTo] = useState(initialData?.to || 'Durham, NC');
   const [departureTime, setDepartureTime] = useState(initialData?.departureTime || '10:00 AM');
 
-  useEffect(() => {
+  // 🔧 FIX: Use useCallback to memoize the callback function
+  const notifyChange = useCallback(() => {
     if (onChange) {
       onChange({ from, to, departureTime });
     }
   }, [from, to, departureTime, onChange]);
+
+  useEffect(() => {
+    notifyChange();
+  }, [notifyChange]);
+
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  
+  useEffect(() => {
+    if (hasUserInteracted && onChange) {
+      onChange({ from, to, departureTime });
+    }
+  }, [from, to, departureTime, onChange, hasUserInteracted]);
+
+  const handleFromChange = (value: string) => {
+    setHasUserInteracted(true);
+    setFrom(value);
+  };
+
+  const handleToChange = (value: string) => {
+    setHasUserInteracted(true);
+    setTo(value);
+  };
+
+  const handleTimeChange = (value: string) => {
+    setHasUserInteracted(true);
+    setDepartureTime(value);
+  };
 
   return (
     <View style={styles.container}>
@@ -159,7 +188,7 @@ export function RouteInput({ initialData, onChange }: RouteInputProps) {
           <TextInput
             style={styles.input}
             value={from}
-            onChangeText={setFrom}
+            onChangeText={handleFromChange}
             placeholder="Enter starting location"
           />
         </View>
@@ -169,7 +198,7 @@ export function RouteInput({ initialData, onChange }: RouteInputProps) {
           <TextInput
             style={styles.input}
             value={to}
-            onChangeText={setTo}
+            onChangeText={handleToChange}
             placeholder="Enter destination"
           />
         </View>
@@ -179,7 +208,7 @@ export function RouteInput({ initialData, onChange }: RouteInputProps) {
           <TextInput
             style={styles.input}
             value={departureTime}
-            onChangeText={setDepartureTime}
+            onChangeText={handleTimeChange}
             placeholder="Set departure time (e.g., 10:00 AM)"
           />
         </View>

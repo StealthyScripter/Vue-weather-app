@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { authService, User, LoginCredentials, SignupData } from '../services';
 
 interface AuthContextType {
@@ -22,11 +22,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
+  const refreshToken = useCallback(async () => {
+    try {
+      const newToken = await authService.refreshToken();
+      if (!newToken) {
+        throw new Error('Failed to refresh token');
+      }
+      // Token refreshed successfully, user is still authenticated
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error;
+    }
+  }, []); // No dependencies needed for this function
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
     try {
       const authenticated = await authService.isAuthenticated();
       setIsAuthenticated(authenticated);
@@ -42,9 +53,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [refreshToken]); // Only depends on refreshToken
 
-  const login = async (credentials: LoginCredentials) => {
+  // 🔧 FIX: Run only once on mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []); // Empty dependency array - run only on mount
+
+  const login = useCallback(async (credentials: LoginCredentials) => {
     try {
       setIsLoading(true);
       const response = await authService.login(credentials);
@@ -57,9 +73,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies needed
 
-  const signup = async (userData: SignupData) => {
+  const signup = useCallback(async (userData: SignupData) => {
     try {
       setIsLoading(true);
       const response = await authService.signup(userData);
@@ -72,9 +88,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies needed
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       await authService.logout();
@@ -85,26 +101,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsAuthenticated(false);
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies needed
 
-  const refreshToken = async () => {
-    try {
-      const newToken = await authService.refreshToken();
-      if (!newToken) {
-        throw new Error('Failed to refresh token');
-      }
-      // Token refreshed successfully, user is still authenticated
-      // Note: In a real app, you might want to decode the token to get user info
-      // or make a separate API call to get current user data
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      setUser(null);
-      setIsAuthenticated(false);
-      throw error;
-    }
-  };
-
-  const value: AuthContextType = {
+  // 🔧 FIX: Memoize the context value to prevent unnecessary re-renders
+  const contextValue = React.useMemo<AuthContextType>(() => ({
     user,
     isLoading,
     isAuthenticated,
@@ -112,10 +112,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
     logout,
     refreshToken,
-  };
+  }), [user, isLoading, isAuthenticated, login, signup, logout, refreshToken]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

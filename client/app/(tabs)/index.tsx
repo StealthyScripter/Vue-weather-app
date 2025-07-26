@@ -1,82 +1,4 @@
-// import React from 'react';
-// import { ScrollView, View, Text, StyleSheet, SafeAreaView } from 'react-native';
-// import { WeatherCard } from '../../components/WeatherCard';
-// import { MetricCard } from '../../components/MetricCard';
-// import { ForecastItem } from '../../components/ForecastItem';
-
-// export default function WeatherDashboard() {
-//   const forecastData = [
-//     { day: 'Today', icon: '⛅', high: 90, low: 73 },
-//     { day: 'Mon', icon: '🌧', high: 88, low: 74 },
-//     { day: 'Tue', icon: '🌧', high: 87, low: 74 },
-//     { day: 'Wed', icon: '☁️', high: 88, low: 74 },
-//   ];
-
-//   return (
-//     <SafeAreaView style={styles.container}>
-//       <ScrollView contentContainerStyle={styles.content}>
-//         <WeatherCard
-//           location="Kings Mountain"
-//           temperature={84}
-//           condition="Partly Cloudy"
-//           high={90}
-//           low={73}
-//         />
-        
-//         <View style={styles.metricsGrid}>
-//           <MetricCard title="AIR QUALITY" value="35" subtitle="Good" />
-//           <MetricCard title="UV INDEX" value="6" subtitle="High" />
-//           <MetricCard title="WIND" value="4 mph" subtitle="ESE" />
-//           <MetricCard title="HUMIDITY" value="75%" subtitle="Dew point 75°" />
-//         </View>
-
-//         <View style={styles.forecastSection}>
-//           <Text style={styles.forecastTitle}>10-DAY FORECAST</Text>
-//           {forecastData.map((item, index) => (
-//             <ForecastItem
-//               key={index}
-//               day={item.day}
-//               icon={item.icon}
-//               high={item.high}
-//               low={item.low}
-//             />
-//           ))}
-//         </View>
-//       </ScrollView>
-//     </SafeAreaView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#87CEEB',
-//   },
-//   content: {
-//     padding: 16,
-//   },
-//   metricsGrid: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     gap: 12,
-//     marginVertical: 20,
-//   },
-//   forecastSection: {
-//     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-//     borderRadius: 16,
-//     padding: 16,
-//     marginTop: 16,
-//   },
-//   forecastTitle: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#6b7280',
-//     marginBottom: 12,
-//   },
-// });
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
 import { WeatherCard } from '../../components/WeatherCard';
 import { MetricCard } from '../../components/MetricCard';
@@ -90,11 +12,8 @@ export default function WeatherDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [location, setLocation] = useState({ latitude: 35.3021, longitude: -81.3400 });
 
-  useEffect(() => {
-    loadWeatherData();
-  }, []);
-
-  const loadWeatherData = async () => {
+  // 🔧 FIX: Use useCallback to prevent recreation on every render
+  const loadWeatherData = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -119,9 +38,15 @@ export default function WeatherDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies needed since this function doesn't depend on state
 
-  const getWeatherIcon = (condition: string): string => {
+  // 🔧 FIX: Only run once on mount
+  useEffect(() => {
+    loadWeatherData();
+  }, [loadWeatherData]); // Include loadWeatherData in dependencies
+
+  // 🔧 FIX: Memoize weather icon function to prevent recreation
+  const getWeatherIcon = useCallback((condition: string): string => {
     const iconMap: Record<string, string> = {
       'sunny': '☀️',
       'partly_cloudy': '⛅',
@@ -133,7 +58,7 @@ export default function WeatherDashboard() {
       'foggy': '🌫'
     };
     return iconMap[condition] || '☀️';
-  };
+  }, []); // No dependencies needed
 
   if (isLoading) {
     return (
@@ -194,7 +119,7 @@ export default function WeatherDashboard() {
           <Text style={styles.forecastTitle}>{forecast.forecast.length}-DAY FORECAST</Text>
           {forecast.forecast.map((item, index: number) => (
             <ForecastItem
-              key={index}
+              key={`${item.day}-${index}`} // 🔧 FIX: Better key to prevent re-renders
               day={item.day}
               icon={getWeatherIcon(item.condition)}
               high={item.high_temp}

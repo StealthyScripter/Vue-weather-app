@@ -65,8 +65,7 @@
 // });
 
 
-// client/app/(tabs)/route.tsx
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -97,13 +96,11 @@ export default function RouteScreen() {
     try {
       setIsLoading(true);
 
-      // Geocode the from and to addresses
       const [originResult, destinationResult] = await Promise.all([
         locationService.geocodeAddress(routeData.from),
         locationService.geocodeAddress(routeData.to),
       ]);
 
-      // Convert departure time to ISO string (simplified - in real app would use proper date picker)
       const today = new Date();
       const [hours, minutes, period] = routeData.departureTime.match(/(\d+):(\d+) (AM|PM)/)?.slice(1) || ['10', '00', 'AM'];
       let hour = parseInt(hours);
@@ -113,7 +110,6 @@ export default function RouteScreen() {
       today.setHours(hour, parseInt(minutes), 0, 0);
       const departureTime = today.toISOString();
 
-      // Plan route with weather prediction
       const prediction = await routeService.predictWeatherAlongRoute(
         {
           latitude: originResult.latitude,
@@ -126,9 +122,6 @@ export default function RouteScreen() {
         departureTime
       );
 
-      // Store the prediction data for the results screen
-      // In a real app, you might want to use a global state management solution
-      // For now, we'll pass it through navigation params
       router.push({
         pathname: '/route-results' as any,
         params: {
@@ -149,9 +142,10 @@ export default function RouteScreen() {
     }
   };
 
-  const handleRouteDataChange = (data: { from: string; to: string; departureTime: string }) => {
+  // 🔧 FIX: Wrap in useCallback to prevent infinite re-renders
+  const handleRouteDataChange = useCallback((data: { from: string; to: string; departureTime: string }) => {
     setRouteData(data);
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any values
 
   return (
     <SafeAreaView style={styles.container}>
