@@ -9,7 +9,7 @@ router.post('/plan', async (req, res) => {
     try {
         const { origin, destination, departure_time, preferences = {} } = req.body;
         
-        // Validation
+        // Enhanced validation
         if (!origin || !destination) {
             return res.status(400).json({
                 success: false,
@@ -20,18 +20,70 @@ router.post('/plan', async (req, res) => {
             });
         }
         
-        if (!origin.latitude || !origin.longitude || !destination.latitude || !destination.longitude) {
+        // Validate origin coordinates
+        if (!origin.latitude || !origin.longitude || 
+            typeof origin.latitude !== 'number' || typeof origin.longitude !== 'number') {
             return res.status(400).json({
                 success: false,
                 error: {
-                    code: 'INVALID_COORDINATES',
-                    message: 'Valid latitude and longitude are required for both origin and destination'
+                    code: 'INVALID_ORIGIN',
+                    message: 'Valid origin latitude and longitude (numbers) are required'
                 }
             });
         }
         
+        // Validate destination coordinates  
+        if (!destination.latitude || !destination.longitude ||
+            typeof destination.latitude !== 'number' || typeof destination.longitude !== 'number') {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_DESTINATION', 
+                    message: 'Valid destination latitude and longitude (numbers) are required'
+                }
+            });
+        }
+        
+        // Validate coordinate ranges
+        if (origin.latitude < -90 || origin.latitude > 90 || 
+            origin.longitude < -180 || origin.longitude > 180) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_ORIGIN_COORDINATES',
+                    message: 'Origin coordinates out of valid range'
+                }
+            });
+        }
+        
+        if (destination.latitude < -90 || destination.latitude > 90 || 
+            destination.longitude < -180 || destination.longitude > 180) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_DESTINATION_COORDINATES',
+                    message: 'Destination coordinates out of valid range'
+                }
+            });
+        }
+        
+        // Validate departure_time format if provided
+        if (departure_time) {
+            const departureDate = new Date(departure_time);
+            if (isNaN(departureDate.getTime())) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_DEPARTURE_TIME',
+                        message: 'Invalid departure time format. Use ISO 8601 format (e.g., 2025-07-28T14:00:00Z)'
+                    }
+                });
+            }
+        }
+        
         const departureTime = departure_time || new Date().toISOString();
         
+        // Continue with existing route planning logic...
         const route = await navigationService.planRoute(
             origin,
             destination,
