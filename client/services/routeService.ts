@@ -208,7 +208,7 @@ class RouteService {
       const response = await apiService.post<RouteWeatherPrediction>('/api/route-weather/predict', {
         origin,
         destination,
-        departure_time: departureTime || new Date().toISOString(),
+        departure_time: departureTime,
         preferences: preferences || {},
       });
       
